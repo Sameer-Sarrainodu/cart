@@ -1,20 +1,43 @@
 # second method
+# ==========================
+# Stage 1: Build dependencies
+# ==========================
 FROM node:20-alpine3.21 AS builder
-WORKDIR /opt/server
-COPY package.json .
-COPY *.js .
-RUN npm install
 
+WORKDIR /opt/server
+
+# Install only production dependencies
+COPY package.json .
+RUN npm install --omit=dev
+
+# Copy application source code
+COPY *.js .
+
+
+# ==========================
+# Stage 2: Runtime Image
+# ==========================
 FROM node:20-alpine3.21
+
+# Create non-root user (clean readable structure)
 RUN addgroup -S roboshop && \
-    adduser -S -D -H -h /opt/server -s /sbin/nologin -G roboshop roboshop
+    adduser -S -G roboshop roboshop
+
+WORKDIR /opt/server
+USER roboshop
+
+# Environment variables runtime needs
 ENV REDIS_HOST=redis \
     CATALOGUE_HOST=catalogue \
     CATALOGUE_PORT=8080
-WORKDIR /opt/server
-USER roboshop
-COPY --from=builder /opt/server /opt/server
-CMD ["node","server.js"]
+
+# Copy built app from builder image
+COPY --from=builder --chown=roboshop:roboshop /opt/server /opt/server
+
+EXPOSE 8080
+
+CMD ["node", "server.js"]
+
 
 
 
